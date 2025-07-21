@@ -84,21 +84,6 @@ from .views import get_treatment_by_disease  # Assuming same file, otherwise imp
 def mock_classification(request):
     image = request.FILES.get('image', None)
 
-    saved_image_path = None
-
-    if image:
-        folder = os.path.join(settings.MEDIA_ROOT, 'classified_images')
-        os.makedirs(folder, exist_ok=True)
-
-        filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.name}"
-        filepath = os.path.join(folder, filename)
-
-        with open(filepath, 'wb+') as destination:
-            for chunk in image.chunks():
-                destination.write(chunk)
-
-        saved_image_path = os.path.join('classified_images', filename)
-
     # 33% chance it's healthy
     is_healthy = random.choice([True, False, False])
 
