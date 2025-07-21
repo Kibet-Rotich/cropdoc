@@ -12,4 +12,6 @@ urlpatterns = [
     path('', include(router.urls)),
     path('get-treatment/', get_treatment_by_disease),
     path('user-stats/', user_stats),
+    path('mock-classify/', mock_classification),
+    path('sample-images/', get_sample_images),
 ]

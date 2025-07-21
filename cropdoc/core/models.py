@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 
 class User(models.Model):
@@ -5,14 +6,13 @@ class User(models.Model):
         ('farmer', 'Farmer'),
         ('extension_officer', 'Extension Officer'),
         ('researcher', 'Researcher'),
-        ('admin', 'Admin'),
     ]
     COUNTRY_CHOICES = [
         ('Kenya', 'Kenya'),
         ('Other', 'Other'),
     ]
 
-    user_id = models.AutoField(primary_key=True)
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     country = models.CharField(max_length=20, choices=COUNTRY_CHOICES)
     county = models.CharField(max_length=50, blank=True, null=True)
@@ -21,6 +21,7 @@ class User(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.role})"
+
 
 
 class Crop(models.Model):
