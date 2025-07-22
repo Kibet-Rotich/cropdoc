@@ -84,6 +84,8 @@ from .views import get_treatment_by_disease  # Assuming same file, otherwise imp
 def mock_classification(request):
     image = request.FILES.get('image', None)
 
+    saved_image_path = None
+
     # 33% chance it's healthy
     is_healthy = random.choice([True, False, False])
 
@@ -124,6 +126,11 @@ from rest_framework.response import Response
 
 @api_view(['GET'])
 def get_sample_images(request):
+    """
+    Returns a list of URLs to sample images in the media folder.
+
+    The endpoint is useful for testing the image upload and classification functionality.
+    """
     sample_folder = os.path.join(settings.MEDIA_ROOT, 'sample_images')
     media_url_prefix = request.build_absolute_uri(settings.MEDIA_URL + 'sample_images/')
 
