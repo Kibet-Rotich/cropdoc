@@ -3,8 +3,9 @@ djangorestframework
 django-cors-headers
 sqlparse
 asgiref
-torch
-torchvision
+torch==2.8.0+cpu
+torchvision==0.23.0+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
 timm
 numpy
 pandas
@@ -24,3 +25,4 @@ pytz
 tzdata
 typing_extensions
 six
+gunicorn
