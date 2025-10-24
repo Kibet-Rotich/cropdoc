@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import *
+from django.conf.urls.static import static
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -12,6 +13,6 @@ urlpatterns = [
     path('', include(router.urls)),
     path('get-treatment/', get_treatment_by_disease),
     path('user-stats/', user_stats),
-    path('mock-classify/', mock_classification),
+    path('classify/', classify_image, name='classify_image'),
     path('sample-images/', get_sample_images),
-]
+]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

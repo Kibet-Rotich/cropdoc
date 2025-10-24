@@ -1,14 +1,37 @@
-from rest_framework import viewsets
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+# core/views.py
+
+# ─── Standard Library Imports ────────────────────────────────────────────────
+import os
+
+# ─── Django Imports ───────────────────────────────────────────────────────────
+from django.conf import settings
 from django.db.models import Count
+
+# ─── DRF Imports ──────────────────────────────────────────────────────────────
+from rest_framework import viewsets
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.response import Response
+
+# ─── Local Imports ────────────────────────────────────────────────────────────
 from .models import User, Crop, CropDisease, DiseaseTreatment
-from .serializers import *
+from .serializers import (
+    UserSerializer,
+    CropSerializer,
+    CropDiseaseSerializer,
+    DiseaseTreatmentSerializer,
+)
+from .ml.inference import predict_with_lime_blue  # or quick_predict if testing
 
-from .models import DiseaseTreatment, CropDisease
-from .serializers import DiseaseTreatmentSerializer
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Utility Function: Get Treatments for a Disease
+# ─────────────────────────────────────────────────────────────────────────────
 def get_treatments_for_disease(disease_id=None, disease_name=None):
+    """
+    Retrieve treatment recommendations for a given disease.
+    Accepts either `disease_id` or `disease_name`.
+    """
     if disease_id:
         treatments = DiseaseTreatment.objects.filter(disease_id=disease_id)
     elif disease_name:
@@ -18,129 +41,158 @@ def get_treatments_for_disease(disease_id=None, disease_name=None):
         except CropDisease.DoesNotExist:
             return None, "Disease not found"
     else:
-        return None, "Provide disease id or name"
+        return None, "Provide disease ID or name"
 
     serializer = DiseaseTreatmentSerializer(treatments, many=True)
     return serializer.data, None
 
 
-# 1. ViewSets for CRUD
-class CropViewSet(viewsets.ModelViewSet):
-    queryset = Crop.objects.all()
-    serializer_class = CropSerializer
-
-class CropDiseaseViewSet(viewsets.ModelViewSet):
-    queryset = CropDisease.objects.all()
-    serializer_class = CropDiseaseSerializer
-
-class DiseaseTreatmentViewSet(viewsets.ModelViewSet):
-    queryset = DiseaseTreatment.objects.all()
-    serializer_class = DiseaseTreatmentSerializer
-
+# ─────────────────────────────────────────────────────────────────────────────
+# ViewSets (CRUD Endpoints)
+# ─────────────────────────────────────────────────────────────────────────────
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
 
-# 2. Get treatment for a disease (by ID or name)
-@api_view(['GET'])
+class CropViewSet(viewsets.ModelViewSet):
+    queryset = Crop.objects.all()
+    serializer_class = CropSerializer
+
+
+class CropDiseaseViewSet(viewsets.ModelViewSet):
+    queryset = CropDisease.objects.all()
+    serializer_class = CropDiseaseSerializer
+
+
+class DiseaseTreatmentViewSet(viewsets.ModelViewSet):
+    queryset = DiseaseTreatment.objects.all()
+    serializer_class = DiseaseTreatmentSerializer
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API: Get Treatment by Disease
+# ─────────────────────────────────────────────────────────────────────────────
+@api_view(["GET"])
 def get_treatment_by_disease(request):
-    disease_id = request.GET.get('id')
-    disease_name = request.GET.get('name')
+    """
+    Retrieve treatment recommendations for a specific crop disease.
+    Supports filtering by `id` or `name` query parameter.
+    """
+    disease_id = request.GET.get("id")
+    disease_name = request.GET.get("name")
 
     data, error = get_treatments_for_disease(disease_id, disease_name)
-
     if error:
         return Response({"error": error}, status=400)
 
     return Response(data)
 
 
-
-# 3. User statistics by country and county
-@api_view(['GET'])
+# ─────────────────────────────────────────────────────────────────────────────
+# API: User Statistics
+# ─────────────────────────────────────────────────────────────────────────────
+@api_view(["GET"])
 def user_stats(request):
-    by_country = User.objects.values('country').annotate(total=Count('id'))
-    by_county = User.objects.values('county').annotate(total=Count('id')).exclude(county=None)
-    
+    """
+    Returns counts of users grouped by country and county.
+    """
+    by_country = User.objects.values("country").annotate(total=Count("id"))
+    by_county = (
+        User.objects.values("county")
+        .annotate(total=Count("id"))
+        .exclude(county=None)
+    )
+
     return Response({
         "by_country": by_country,
-        "by_county": by_county
+        "by_county": by_county,
     })
 
 
-import os
-import random
-from datetime import datetime
-from django.conf import settings
-from rest_framework.decorators import api_view, parser_classes
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.response import Response
-from .models import CropDisease
-from .views import get_treatment_by_disease  # Assuming same file, otherwise import properly
-
-@api_view(['POST'])
+# ─────────────────────────────────────────────────────────────────────────────
+# API: Classify Uploaded Image
+# ─────────────────────────────────────────────────────────────────────────────
+@api_view(["POST"])
 @parser_classes([MultiPartParser, FormParser])
-def mock_classification(request):
-    image = request.FILES.get('image', None)
+def classify_image(request):
+    """
+    Handles image upload and classification.
+    Optionally, can attach treatment recommendations for detected diseases.
+    """
+    image = request.FILES.get("image")
+    if not image:
+        return Response({"error": "No image provided"}, status=400)
 
-    saved_image_path = None
+    # Ensure upload directory exists
+    upload_dir = os.path.join(settings.MEDIA_ROOT, "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
 
-    # 33% chance it's healthy
-    is_healthy = random.choice([True, False, False])
+    # Save uploaded file securely (avoid path traversal)
+    safe_filename = os.path.basename(image.name)
+    image_path = os.path.join(upload_dir, safe_filename)
 
-    if is_healthy:
-        return Response({
-            "result": "Healthy",
-            "confidence": round(random.uniform(0.9, 1.0), 2),
-            "saved_image": saved_image_path,
-            "recommendation": None
-        })
+    with open(image_path, "wb+") as f:
+        for chunk in image.chunks():
+            f.write(chunk)
 
-    # Pick a random disease
-    diseases = CropDisease.objects.all()
-    if not diseases.exists():
-        return Response({"error": "No diseases in DB"}, status=404)
+    # Run model inference (LIME or quick_predict)
+    result = predict_with_lime_blue(
+        image_path,
+        save_dir=os.path.join(settings.MEDIA_ROOT, "lime_explanations"),
+    )
 
-    disease = random.choice(diseases)
+    # Optional: Attach treatment recommendations
+    recommendation = None
+    if result["class"].lower() != "healthy":
+        disease = CropDisease.objects.filter(
+            disease_name__iexact=result["class"]
+        ).first()
+        if disease:
+            recommendation, _ = get_treatments_for_disease(
+                disease_id=disease.disease_id
+            )
 
-    # Create a dummy GET request to simulate calling the original function
-    class DummyRequest:
-        GET = {'id': str(disease.disease_id)}
-
-    treatment_data, error = get_treatments_for_disease(disease_id=disease.disease_id)
-
+    # Build URLs for media files
+    media_url = request.build_absolute_uri(settings.MEDIA_URL)
+    lime_url = None
+    if "lime_path" in result:
+        lime_url = media_url + "lime_explanations/" + os.path.basename(result["lime_path"])
 
     return Response({
-        "result": disease.disease_name,
-        "confidence": round(random.uniform(0.7, 0.95), 2),
-        "recommendation": treatment_data,  # List of treatments
-        "saved_image": saved_image_path
+        "result": result.get("class"),
+        "confidence": result.get("confidence"),
+        "lime_image": lime_url,
+        "saved_image": media_url + "uploads/" + safe_filename,
+        "recommendations": recommendation,
     })
 
 
-import os
-from django.conf import settings
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+# ─────────────────────────────────────────────────────────────────────────────
+# API: Get Sample Images
+# ─────────────────────────────────────────────────────────────────────────────
+from urllib.parse import quote
 
-@api_view(['GET'])
+@api_view(["GET"])
 def get_sample_images(request):
     """
-    Returns a list of URLs to sample images in the media folder.
-
-    The endpoint is useful for testing the image upload and classification functionality.
+    Returns a list of sample images from `media/sample_images/`.
+    Each entry contains the image name and its encoded URL.
     """
-    sample_folder = os.path.join(settings.MEDIA_ROOT, 'sample_images')
-    media_url_prefix = request.build_absolute_uri(settings.MEDIA_URL + 'sample_images/')
-
+    sample_folder = os.path.join(settings.MEDIA_ROOT, "sample_images")
     if not os.path.exists(sample_folder):
         return Response({"images": []})
 
-    image_urls = []
-    for file_name in os.listdir(sample_folder):
-        if file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-            full_url = media_url_prefix + file_name
-            image_urls.append(full_url)
+    media_url_prefix = request.build_absolute_uri(settings.MEDIA_URL + "sample_images/")
 
-    return Response({"images": image_urls})
+    images = []
+    for file_name in os.listdir(sample_folder):
+        if file_name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+            encoded_name = quote(file_name)
+            images.append({
+                "name": file_name,
+                "url": media_url_prefix + encoded_name,
+            })
+
+    return Response({"images": images})
+
