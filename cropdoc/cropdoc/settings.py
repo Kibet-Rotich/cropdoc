@@ -78,31 +78,27 @@ TEMPLATES = [
 WSGI_APPLICATION = 'cropdoc.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'cropdoc-db',
-#         'USER':'cddb_user',
-#         'PASSWORD': '5q5kgEkbcrDsBETFNpffB1GJUwZe0dmR',
-#         'HOST': 'dpg-d42v5ier433s73e1v3bg-a',
-#         'PORT': '5432'
-#     }
-# }
+
 
 
 import os
+from pathlib import Path
 import dj_database_url
+from dotenv import load_dotenv
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+load_dotenv(os.path.join(BASE_DIR, '.env')) 
 
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL", "postgresql://cddb_user:5q5kgEkbcrDsBETFNpffB1GJUwZe0dmR@dpg-d42v5ier433s73e1v3bg-a.oregon-postgres.render.com/cddb")
+        default=os.environ.get("DATABASE_URL", "dblink") 
     )
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
