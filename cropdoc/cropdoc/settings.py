@@ -81,11 +81,26 @@ WSGI_APPLICATION = 'cropdoc.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'cropdoc-db',
+#         'USER':'cddb_user',
+#         'PASSWORD': '5q5kgEkbcrDsBETFNpffB1GJUwZe0dmR',
+#         'HOST': 'dpg-d42v5ier433s73e1v3bg-a',
+#         'PORT': '5432'
+#     }
+# }
+
+
+import os
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.config(
+        default=os.environ.get("DATABASE_URL", "postgresql://cddb_user:5q5kgEkbcrDsBETFNpffB1GJUwZe0dmR@dpg-d42v5ier433s73e1v3bg-a.oregon-postgres.render.com/cddb")
+    )
 }
 
 

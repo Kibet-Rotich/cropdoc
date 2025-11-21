@@ -12,7 +12,7 @@ router.register(r'treatments', DiseaseTreatmentViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('get-treatment/', get_treatment_by_disease),
+    path('diseases/', get_all_diseases, name='all-diseases'),
     path('user-stats/', user_stats),
-    path('classify/', classify_image, name='classify_image'),
     path('sample-images/', get_sample_images),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

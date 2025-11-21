@@ -27,6 +27,7 @@ class User(models.Model):
 class Crop(models.Model):
     crop_id = models.AutoField(primary_key=True)
     crop_name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return self.crop_name
@@ -36,10 +37,8 @@ class CropDisease(models.Model):
     disease_id = models.AutoField(primary_key=True)
     crop = models.ForeignKey(Crop, on_delete=models.CASCADE, related_name='diseases')
     disease_name = models.CharField(max_length=100)
-    disease_characteristics = models.TextField()
-
-    def __str__(self):
-        return f"{self.disease_name} ({self.crop.crop_name})"
+    symptoms = models.TextField(null=True, blank=True)
+    prevention = models.TextField(null=True, blank=True)
 
 
 class DiseaseTreatment(models.Model):

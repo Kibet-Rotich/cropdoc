@@ -21,7 +21,7 @@ from .serializers import (
     CropDiseaseSerializer,
     DiseaseTreatmentSerializer,
 )
-from .ml.inference import predict_with_lime_blue  # or quick_predict if testing
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -88,6 +88,24 @@ def get_treatment_by_disease(request):
 
     return Response(data)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# API: Get All Diseases
+# ─────────────────────────────────────────────────────────────────────────────
+@api_view(["GET"])
+def get_all_diseases(request):
+    """
+    Retrieve a list of all CropDisease objects with their ID, name, 
+    characteristics, and associated crop name.
+    """
+    # Use select_related to fetch the Crop object in the same query 
+    # to avoid the N+1 query problem.
+    diseases = CropDisease.objects.select_related('crop').all()
+    
+    # We will use the existing CropDiseaseSerializer, which should include all fields.
+    serializer = CropDiseaseSerializer(diseases, many=True)
+    
+    return Response(serializer.data)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API: User Statistics
@@ -107,64 +125,6 @@ def user_stats(request):
     return Response({
         "by_country": by_country,
         "by_county": by_county,
-    })
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# API: Classify Uploaded Image
-# ─────────────────────────────────────────────────────────────────────────────
-@api_view(["POST"])
-@parser_classes([MultiPartParser, FormParser])
-def classify_image(request):
-    """
-    Handles image upload and classification.
-    Optionally, can attach treatment recommendations for detected diseases.
-    """
-    image = request.FILES.get("image")
-    if not image:
-        return Response({"error": "No image provided"}, status=400)
-
-    # Ensure upload directory exists
-    upload_dir = os.path.join(settings.MEDIA_ROOT, "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-
-    # Save uploaded file securely (avoid path traversal)
-    safe_filename = os.path.basename(image.name)
-    image_path = os.path.join(upload_dir, safe_filename)
-
-    with open(image_path, "wb+") as f:
-        for chunk in image.chunks():
-            f.write(chunk)
-
-    # Run model inference (LIME or quick_predict)
-    result = predict_with_lime_blue(
-        image_path,
-        save_dir=os.path.join(settings.MEDIA_ROOT, "lime_explanations"),
-    )
-
-    # Optional: Attach treatment recommendations
-    recommendation = None
-    if result["class"].lower() != "healthy":
-        disease = CropDisease.objects.filter(
-            disease_name__iexact=result["class"]
-        ).first()
-        if disease:
-            recommendation, _ = get_treatments_for_disease(
-                disease_id=disease.disease_id
-            )
-
-    # Build URLs for media files
-    media_url = request.build_absolute_uri(settings.MEDIA_URL)
-    lime_url = None
-    if "lime_path" in result:
-        lime_url = media_url + "lime_explanations/" + os.path.basename(result["lime_path"])
-
-    return Response({
-        "result": result.get("class"),
-        "confidence": result.get("confidence"),
-        "lime_image": lime_url,
-        "saved_image": media_url + "uploads/" + safe_filename,
-        "recommendations": recommendation,
     })
 
 

@@ -20,6 +20,20 @@ class CropDiseaseSerializer(serializers.ModelSerializer):
 
 
 class DiseaseTreatmentSerializer(serializers.ModelSerializer):
+    disease_name = serializers.CharField(source="disease.disease_name", read_only=True)
+    symptoms = serializers.CharField(source="disease.symptoms", read_only=True)
+    prevention = serializers.CharField(source="disease.prevention", read_only=True)
+
     class Meta:
         model = DiseaseTreatment
-        fields = '__all__'
+        fields = [
+            "drug_id",
+            "drug_name",
+            "drug_administration_instructions",
+            "disease",       # ID
+            "crop",
+            "disease_name",  # New
+            "symptoms",      # New
+            "prevention",    # New
+        ]
+
